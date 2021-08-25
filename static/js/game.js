@@ -1,4 +1,4 @@
-let win = window,
+let win = window,  
     doc = document,
     docElem = doc.documentElement,
     body = doc.getElementsByTagName('body')[0],
@@ -15,6 +15,7 @@ let app = new PIXI.Application({
 
 });
 let status = true;
+let countIncInterval = null;
 let screen= {
     'x' : 0,
     'y' : 0,
@@ -33,11 +34,13 @@ let step = x > y ? y * 0.1 : x * 0.1;
 let stepEnemy = x > y ? y * 0.065 : x * 0.065;
 let enemiesTexture = [];
 let enemiesInterval = null;
+let enemiesBulletFire =null;
 let deathEnemyCount = 0;
 let highscore = JSON.parse(localStorage.getItem('highscore'));
 let shieldTexture = new PIXI.Texture.from(spritePath + "shield3.png");
 let playerTexture = PIXI.Texture.from(spritePath + "playerShip1_red.png");
 let bulletTexture = PIXI.Texture.from(spritePath + "laserRed03.png");
+let enemyBulletsTexture = PIXI.Texture.from(spritePath + "laserGreen.png");
 let enemyTexture= PIXI.Texture.from(spritePath+ "ufoYellow.png");
 let enemyTexture1= PIXI.Texture.from(spritePath+ "ufoGreen.png");
 let enemyTexture2= PIXI.Texture.from(spritePath+ "ufoBlue.png");
@@ -58,19 +61,12 @@ enemiesTexture.push(enemyTexture);
 enemiesTexture.push(enemyTexture1);
 enemiesTexture.push(enemyTexture2);
 
-
+enemiesBullets=[];
 
 enemy= new PIXI.Sprite(enemyTexture);
-enemy.width=stepEnemy;
-enemy.height=stepEnemy;
-enemy.x=screen.width-(stepEnemy/2);
-enemy.y=randomInt(0,screen.height-stepEnemy/2);
-enemy.anchor.set(0.5);
-enemy.vx=-1;
-enemy.vy=0;
-enemies.push(enemy);
 
-//enemy.rotation=0;
+
+enemies.push(enemy);
 
 enemy.move = function(){
 
@@ -81,19 +77,17 @@ function randomInt(min, max){
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-
-
-
 player = new PIXI.Sprite(playerTexture);
 player.x = x * 0.5;
-player.y = y * 0.5;
+player.y = screen.height -  player.height/2 ; 
 player.width = step;
 player.height = step;
 player.anchor.set(0.5);
 player.vx = 0;
 player.vy = 0;
 player.rotation = 0;
-player.fireStatus = true;
+player.fireStatus = true;   //  Checking for fire limit per 350ms
+player.maxEnergy = 100;
 player.move = function(){
     let x = contain(this, screen);
     if(x !== undefined){
@@ -106,14 +100,14 @@ player.move = function(){
 player.bullets= [];
 
 player.fire= function(){
-    if(player.fireStatus){
+    if(player.fireStatus){ // Checking for fire limit per 350ms. fireStatus converts to true in 350ms. 
         player.fireStatus = false;
         bullet= new PIXI.Sprite(bulletTexture);
-        bullet.x= player.x + (step) * Math.sin(player.rotation);
-        bullet.y = player.y - (step) * Math.cos(player.rotation);
+        bullet.x= player.x + (step) * Math.sin(player.rotation); // Bullet rotation but The bullet only moves upwards.
+        bullet.y = player.y - (step) * Math.cos(player.rotation); // Checking rotation and player rotation for up.
         bullet.rotation = player.rotation;
-        bullet.vx=5* Math.sin(player.rotation);
-        bullet.vy=5* Math.cos(player.rotation);
+        bullet.vx=6* Math.sin(player.rotation);
+        bullet.vy=6* Math.cos(player.rotation);
         bullet.anchor.set(0.5);
         app.stage.addChild(bullet);
         this.bullets.push(bullet);
@@ -122,33 +116,64 @@ player.fire= function(){
 
 player.intervalId = null;
 
-player.checkStatus = function(){
+player.checkStatus = function(){ 
     if(!this.fireStatus){
         this.fireStatus = true;
     }
 }
 
-function createEnemy(texture, x, y, width, height){
-    y=y*stepEnemy;
+
+
+
+function createEnemy(texture, x, y, width, height,enemyBulletTexture){
+    
+  
+    
     var enemy = new PIXI.Sprite(texture);
   
     enemy.x = x;
     enemy.y = y;
-    enemy.vx=-1;
+    enemy.vx=randomInt(-2,-1);
     enemy.width=width;
     enemy.height=height;
     enemy.anchor.set(0.5);
-    enemy.move = function(){
-
+    enemy.move = function(){ // Enemies moving leftside.
+        console.log("move");
         enemy.x += enemy.vx;
-    }
+    };
+   
+    enemy.fire = setInterval (function(){ // Enemies fire random time.
+
+        
+
+        
+        let enemyBullet = new PIXI.Sprite(enemyBulletTexture);
+        enemyBullet.height= 0.4 * step;
+        enemyBullet.width= 0.1 * step;
+        enemyBullet.x= enemy.x ;
+        enemyBullet.y = enemy.y + enemy.height;
+       
+       
+
+        enemyBullet.vy=randomInt(1,2);
+        enemyBullet.anchor.set(0.5);
+        app.stage.addChild(enemyBullet);
+        enemiesBullets.push(enemyBullet);
+        console.log("ates");
+        
+    }, randomInt(750,3400)); // Fires randomly between 750 ms and 3400 ms. 
     app.stage.addChild(enemy);
     enemies.push(enemy);
   
 
 }
 
-function contain(player, screen) {
+
+
+
+function contain(player, screen) { // Understand that the textures in the game go out 
+                                    //of the screen and to prevent them from going out of the screen.
+                                    //It was made to prevent the items used in the game from remaining and slowing down.
     let ret = undefined;
     if (player.x + player.width / 2  > screen.width) {
         player.x = screen.width - player.width / 2;
@@ -169,29 +194,23 @@ function contain(player, screen) {
     return ret;
   }
 
-document.addEventListener('keydown', function(event){
+document.addEventListener('keydown', function(event){ // To check the keyboard input
     let name = event.name;
     let code = event.keyCode;
     if (event.defaultPrevented) {
         return;
     }
-    if((code == 65 || code == 37) && player.vx>-5 ){
-        player.rotation = -Math.PI / 2;
-        player.vx += -1;
+    if((code == 65 || code == 37) && player.vx>-6 ){
+       
+        player.vx += -2;
     } 
     
-    if((code == 87 || code == 38) && player.vy>-5 ){
-        player.rotation = 0;
-        player.vy += -1;
+    
+    if((code == 68 || code == 39) && player.vx<6 ){
+        player.vx += 2;
+   
     }
-    if((code == 68 || code == 39) && player.vx<5 ){
-        player.vx += 1;
-        player.rotation = Math.PI / 2;
-    }
-    if((code == 83 || code == 40) && player.vy<5){
-        player.rotation = Math.PI;
-        player.vy += 1;
-    }
+   
     if(code == 32){
         player.fire();
 
@@ -200,8 +219,8 @@ document.addEventListener('keydown', function(event){
 
 });
 
-document.addEventListener('keyup', function(event){
-    let name = event.name;
+document.addEventListener('keyup', function(event){ // To check the keyboard input
+    let name = event.name; 
     let code = event.keyCode;
     if (event.defaultPrevented) {
         return;
@@ -224,8 +243,8 @@ app.stage.addChild(enemy);
 
 app.ticker.add(function(){
     player.move();
-    player.bullets = player.bullets.filter(element => {
-        let ret = true;
+    player.bullets = player.bullets.filter(element => { // Checking the bullets that go off the screen and deleting the ones that come out
+        let ret = true; // Used for the "filter" function. It causes the element to be deleted from the array list when it returns false.
         element.x=element.x + element.vx;
         element.y= element.y - element.vy;
         if(contain(element, screen) !== undefined){
@@ -235,12 +254,43 @@ app.ticker.add(function(){
         return ret;
     });
 
+    enemiesBullets=enemiesBullets.filter(function(eB){
+        
+        let ret = true;
+        if(hitTestRectangle(player, eB)){ // Checking enemy bullet if hit the player.
+            player.maxEnergy -= 10;
+            energyCounter.counter.width = player.maxEnergy * energyStep;
+            app.stage.removeChild(eB);
+            ret =false;
+            if(player.maxEnergy<=0){
+                stop();
+
+            }
+        }
+        eB.alpha=1;
+        enemies.forEach(function(enemy){
+
+            if(hitTestRectangle(enemy,eB)){
+                eB.alpha=0;
+
+            }
+           
+
+
+
+        });
+
+        eB.y += eB.vy;
+        return ret;
+
+    })
     enemies = enemies.filter(function(e){
         e.move();
         let ret = true;
 
-        
-        if(contain(e, screen) !== undefined){
+        if(contain(e, screen) !== undefined){ // Enemy hit is sent off the map.
+           
+            clearInterval(e.fire);               // The enemy that goes out of the map is deleted from the game.
             app.stage.removeChild(e);
 
             ret = false;
@@ -248,10 +298,12 @@ app.ticker.add(function(){
        
 
         player.bullets.forEach(function(b){
-            if(hitTestRectangle(b, e)){
+            if(hitTestRectangle(b, e)){ // If the player's bullets hit the enemy. That enemy will die.
+                clearInterval(e.fire);
                 app.stage.removeChild(b);
                 app.stage.removeChild(e);
-                b.x = x * 10;
+               
+                b.x = x * 10;               // the bullet must be deleted so the bullet is taken out of the map.
                 b.y = y * 10;
                 deathEnemyCount+=1;
                 loText.text = "Dead enemy :"+ deathEnemyCount;
@@ -261,34 +313,35 @@ app.ticker.add(function(){
         if(hitTestRectangle(player,e)){
             stop();
         }
-        if(hitTestCircle(e,shield)){
-            console.log("Shiled");
-            if(shield.maxEnergy <= 0){
-                stop();
-            }
-            shield.maxEnergy -= 35;
-            app.stage.removeChild(e);
-            ret = false;
-            energyCounter.counter.width = shield.maxEnergy * energyStep;
-            
-        }
+    
+
         
         return ret;
     });
 
 })
-
-enemiesInterval = setInterval(function(){
-    for(let i = 0; i < 3; i++){
-        createEnemy(enemiesTexture[randomInt(0, 2)], screen.width-(stepEnemy/2), 
-        randomInt(stepEnemy / (2*stepEnemy), (y - stepEnemy / 2)/stepEnemy), stepEnemy, stepEnemy);
+let count=1;
+function createEnemyWithCount(c){ //Creating enemy for checking count difficulty
+    console.log(count);
+    for(let i = 0; i < c; i++){  
+      
+        
+        createEnemy(enemiesTexture[randomInt(0, 2)],screen.width-(stepEnemy/2) - i * stepEnemy, 
+        randomInt(stepEnemy, y/2 - stepEnemy/2), stepEnemy, stepEnemy, enemyBulletsTexture);
+        
     }
-}, 10000);
+}
+enemiesInterval = setInterval(function(){
+    createEnemyWithCount(count);  //Creating enemy for checking count difficulty between 3500 ms and 6500ms.
+}, randomInt(3500,6500)); 
 
 player.intervalId = setInterval(function(){
     player.checkStatus();
-}, 500);
+}.bind(count), 350); // Checking for fire limit per 350ms
 
+countIncInterval = setInterval(function(){
+    count++;
+}, 10000);     // The difficulty is increased every 10 seconds.
 
 function hitTestRectangle(r1, r2) {
 
@@ -329,15 +382,7 @@ function hitTestRectangle(r1, r2) {
       return hit;
 }
 
-let shield = new PIXI.Sprite(shieldTexture);
-shield.x = 0;
-shield.y = y * 0.5;
-shield.width = y;
-shield.height = 4 * step;
-shield.anchor.set(0.5);
-shield.rotation = Math.PI / 2;
-shield.maxEnergy = 100;
-app.stage.addChild(shield);
+
 
 let energyCounter = new PIXI.Container();
 energyCounter.x = x-step - step / 5;
@@ -359,7 +404,7 @@ graphic1.drawRoundedRect(0, 0, 2 * step, step / 2, step / 5);
 graphic1.endFill();
 energyCounter.addChild(graphic1);
 
-let energyStep = (2 * step) / (shield.maxEnergy);
+let energyStep = (2 * step) / (player.maxEnergy);
 
 energyCounter.counter = graphic1;
 energyCounter.pivot.x = energyCounter.width /2 ;
@@ -367,22 +412,26 @@ energyCounter.pivot.y = energyCounter.height / 2 ;
 function stop(){
     clearInterval(player.intervalId);
     clearInterval(enemiesInterval);
-    //player.bullets=null;
+    
+    enemies.forEach(function(b){
+       
+            clearInterval(b.fire);
+       });
+    
     enemies=[];
     player.x=x*10;
     player.y=y*10;
 
     app.stage.removeChildren();
-   // document.removeEventListener("keydown", function(){console.log("Clear keydown event")});
-    //document.removeEventListener("keyup", function(){console.log("Clear keyup event")});
+   
     let goText = new PIXI.Text("GAME OVER", style);
     goText.anchor.set(0.5);
     goText.x = x * 0.5;
     goText.y = y * 0.5;
     app.stage.addChild(goText);
     if(deathEnemyCount > highscore){
-        console.log("BİG");
-        localStorage.setItem('highscore', JSON.stringify(deathEnemyCount));
+       
+        localStorage.setItem('highscore', JSON.stringify(deathEnemyCount)); // Max score hiding in local storage.
     }
     setTimeout(function(){
         window.location.assign("../index.html")  ;
